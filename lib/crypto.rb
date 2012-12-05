@@ -3,17 +3,36 @@ require 'rexml/document'
 require 'action_view'
 require 'date'
 require 'pry'
+require 'radix'
 include REXML
 include ActionView::Helpers::SanitizeHelper
 
 module Unique
   def unique_ify(word)
+    if word.length < 2 then return word end 
     u = ''
     word.each_char { |c|
     if u.include? c then next end
       u << c
     }
     return u
+  end
+
+  def pattern_check(string)
+    s = string.split("")
+    h = Hash.new
+    s.map! { |x| Base64.encode64(x)}
+    counter = 0.b(256)
+    s.each { |x|
+      if h.key?(x)
+        next
+      else
+        h.merge!({x => counter})
+        counter += 1
+      end
+    }
+    s.map! { |x| x = h[x] }
+    return s
   end
 end
 
@@ -42,7 +61,7 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
       return feed
   end
 
-  def set_dicts(dicts, source='./data/resultant.txt')
+  def set_dicts(dicts, source='./data/xresultant.txt')
     words = []
     add_to_word_list(words, source)
     dicts = Array.new(20)
@@ -114,13 +133,12 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
   def go_to_work(which=nil)
     #takes the passed argument from main.rb
       if which
-       p = @p_list[which]
+        p = @p_list[which]
          solve(p)
          create_solution(p)
          puts p.solution
-         # puts @dicts_big[1]
       else
-      @p_list.each { |p|
+        @p_list.each { |p|
          solve(p)
          create_solution(p)
          p.set_solve_date
@@ -131,7 +149,7 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
 
   def create_solution(puzz)
     mask = %w[ E T A O I N S H R D L C U M W F G Y P B V K J X Q Z ' -]
-    puzz.solution = (puzz.crypto << "\n" << puzz.author)
+    puzz.solution = (puzz.crypto << ' - ' << puzz.author)
     @let_list.each { |k, v|
       if v.possible.frozen? then next end
       if v.possible.empty? then next end
@@ -144,65 +162,44 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
 
   def solve(puzz)
     c = puzz.crypto_broken
+    c.map! {|x| x = Word.new(x,@dicts)}
     set_letters()
     for z in 1..3
-      for x in 1..unique_ify(c[-1]).length
+      for x in 1..c[-1].length
       c.each { |word|
-        u_word = unique_ify(word)
-        if u_word.length > x then next end
-          passable_words = Set.new
-          passable_words = reverse_lookup(u_word, word, passable_words)           
+        if word.u_length > x then next end
+        if word.possibles.length > 0 
+          reverse_lookup(word)
+          condense_true(word.uniques, word.possibles)           
+        end
         }
       end
     end
   end
 
-  def reverse_lookup(u, w, pwords)
-    # find words of same u.lenght
-    all_same_u = 
-    each char in u.word, see if u[position] is possible
-    if so, add to p words
-    return pwords
-  end
-
-  def w_that_fit(w)
-    uwl = unique_ify(w).length
-    x = Set.new
-    @dicts[w.length].each { |k, v|
-      if v.length != uwl then next end 
-      x << 
-
+  def reverse_lookup(word)
+    word.possibles.keep_if { |x|
+      char_matcher(word.name, x)
     }
-    return x
+    # puts word.possibles
   end
 
-  def count_known_letters(letters)
-    #simple count of letters that have only one left in possible
-    #therefore we KNOW that must be the key. Used to determine confidence level in puzzle
-    count = 0
-    letters.each { |l|
-      if l.possible.length == 1 then count += 1 end
-    }
-    return count
+  def char_matcher(w, p)
+    counter = w.length-1
+    for x in 0..counter
+      if @let_list[w[x]].possible.include?(p[x]) then next end
+      return false
+    end
+    return true
   end
 
-  def remove_badly_formed(words, count)
-    #takes out words created from an overlap of letters
-    #where pet and pep are both real words... they have a different unique count
-    #the unique count is important for letter substitution
-    words.delete_if { |w|
-      unique_ify(w).length != count
-    }
-
-  end
-
-  def condense_true(key, words)
+  def condense_true(key, p_words)
     #For creating an array for each unique letter containing one of each possibility
     #the possible letters will shrink each time a word is tested. Till all contain just one
     #possiblity... or hilarity will ensue in having a cryptogram with an alternate possibility
-    words.map! { |w| unique_ify(w) }
+    words = p_words.map { |w| unique_ify(w) }
 
-    for position in 0...key.length
+    for position in 0..key.length-1
       letter = @let_list[key[position]]
       if letter.possible.frozen? then next end
       letter.possible.clear
@@ -210,13 +207,6 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
         if letter.possible.include?(word[position]) then next end
         letter.possible << word[position]
       }
-    end
-  end
-
-  def append_true(word, list)
-    #Simply adds the word to the passed list when it is verified by the dictionary.
-    if poss(word)
-      list << word
     end
   end
 
@@ -292,6 +282,34 @@ class Letter
       @possible = %w[ E T A O I N S H R D L C U M W F G Y P B V K J X Q Z ]
       @possible.delete(itself.upcase)
     end
+  end
+
+end
+
+class Word
+  attr_accessor :name, :uniques, :u_length, :length, :possibles, :pattern_value
+
+  def initialize(name="test", dictionary)
+    @name = name
+    @uniques = unique_ify(name)
+    @length = @name.length
+    @u_length = @uniques.length
+    @pattern_value = pattern_check(name)
+    @possibles = find_possibles(dictionary)
+  end
+
+  def find_possibles(dictionary)
+    p = Array.new
+    dictionary[@length].each { |k, v|
+      if k.length == @length && v == @u_length  #&& @pattern_value == pattern_check(k)
+        p << k
+
+      end
+    }
+    p.keep_if { |x| 
+      pattern_check(x) == @pattern_value
+    }
+    return p
   end
 
 end
