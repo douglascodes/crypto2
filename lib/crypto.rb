@@ -4,48 +4,24 @@ require 'action_view'
 require 'date'
 require 'pry'
 require 'radix'
+require './lib/unique'
+require './lib/word'
+require './lib/letter'
+require './lib/puzzle'
+# require 'puzzle'
+include Unique
 include REXML
 include ActionView::Helpers::SanitizeHelper
 
-module Unique
-  def unique_ify(word)
-    if word.length < 2 then return word end 
-    u = ''
-    word.each_char { |c|
-    if u.include? c then next end
-      u << c
-    }
-    return u
-  end
-
-  def pattern_check(string)
-    s = string.split("")
-    h = Hash.new
-    s.map! { |x| Base64.encode64(x)}
-    counter = 0.b(256)
-    s.each { |x|
-      if h.key?(x)
-        next
-      else
-        h.merge!({x => counter})
-        counter += 1
-      end
-    }
-    s.map! { |x| x = h[x] }
-    return s
-  end
-end
-
-include Unique
-
 class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Saves em.
-  attr_accessor :p_list, :solved, :let_list, :dicts, :dicts_big, :pop_dict
+  attr_accessor :p_list, :solved, :let_list, :dicts, :dicts_big, :name_dict, :pop_dict
   def initialize
     @p_list = get_puzzles() #List of puzzle objects
     @solved = 0             #Simple enumerator for number of solved puzzles
     @dicts = set_dicts(@dicts, './data/xresultant.txt')
     @pop_dict = set_popular()
-  end
+    @name_dict = set_dicts(@dicts, './data/SMITH.txt')
+  end 
 
   def get_puzzles
     #Loads puzzles for the solver class to work on
@@ -72,6 +48,19 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
     }
     return dicts
   end
+
+  def set_name_dicts(dicts, source='./data/SMITH.txt')
+    words = []
+    add_to_word_list(words, source)
+    dicts = Array.new(20)
+    words.each { |w|
+      w.chomp!
+      w.upcase!
+      add_word(w, dicts)
+    }
+    return dicts
+  end
+
 
   def set_popular(source='./data/top10k.txt')
     words = []
@@ -162,9 +151,15 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
 
   def solve(puzz)
     c = puzz.crypto_broken
+    a = puzz.author_broken
     c.map! {|x| x = Word.new(x,@dicts)}
-    set_letters()
+   
+    a.map! {|x| x = Word.new(x,@name_dict)}
+    
+    set_letters(puzz.full_uniques)
+    
     for z in 1..3
+    
       for x in 1..c[-1].length
       c.each { |word|
         if word.u_length > x then next end
@@ -174,7 +169,30 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
         end
         }
       end
+    
+      for x in 2..a[-1].length
+      a.each { |word|
+        if word.u_length > x then next end
+        if word.length < 2 then next end
+        if word.possibles.length > 0 
+          reverse_lookup(word)
+          condense_true(word.uniques, word.possibles)           
+        end
+        }
+      end
+
+      # if z == 2
+      #   c.each { |word|
+      #     if word.possibles.length < 3 then next end
+      #     word.possibles.keep_if { |w|
+      #       poss(w, @pop_dict)
+      #     }
+      #     condense_true(word.uniques, word.possibles)           
+      #   }
+      # end
     end
+    
+    puzz.let_list = @let_list
   end
 
   def reverse_lookup(word)
@@ -210,106 +228,20 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
     end
   end
 
-  def set_letters()
+  def poss(word, dict)
+    if dict[word.length].key?(word) then return true end
+    return false
+  end
+
+
+  def set_letters(salt)
     #Creates an alphabetical list of LETTER objects
     @let_list = Hash.new
-      for l in "a".."z"
+    salt.chars { |l| 
         @let_list.merge!({l => Letter.new(l)})
-      end
-    @let_list.merge!({'\'' => Letter.new('\'')})
-    @let_list.merge!({'-' => Letter.new('-')})
-  end
-
-end
-
-class Puzzle
-  attr_accessor :crypto, :crypto_broken, :solution, :author_sol, :author, :publ_date, :solve_time,
-    :uniques, :full_uniques
-  def initialize(crypto='ABCDEF', author="Bace Troncons", publ_date=Time.now)
-    @crypto = crypto          #The seperated cryptogram from the author section
-    @author = author          #The seperated author section for the crpytogram
-    @publ_date = publ_date    #The seperated date value
-    @solve_time = nil         #Var for the date/time the solution was first made
-    @uniques = unique_ify(@crypto)
-    @full_uniques = unique_ify((@crypto + @author))
-    set_up_puzzle()
-  end
-
-  def set_solve_date
-    if @solve_time
-      return
-    end
-    @solve_time = Time.now
-  end
-
-  def set_up_puzzle()
-    #Breaks PUZZ into the crypto array sorted by word size
-    @crypto_broken = Set.new
-    @crypto_broken += @crypto.split
-    hyphens = Array.new
-    @crypto_broken.each { |w|
-       if w.include? '-' then hyphens += w.split(/-/) end
-     }
-    @crypto_broken.delete_if { |w|
-      w.include? '-'
-    }
-    @crypto_broken += hyphens
-    @crypto_broken = @crypto_broken.each.sort { |a,b|  #Sorts words by size
-    unique_ify(a).length <=> unique_ify(b).length
-  }
-  end
-
-  def to_s
-    print 'Code: ', @crypto,  "\nDate: ", @publ_date, "\nCompleted: ", @solve_time, "\n"
-  end
-end
-
-class Letter
-  #Letter objects that contain their own NAME, and a list of POSSIBLE interpretations
-  #It is assumed that by the rules of the cryptogram that they cannot end up being themself
-  attr_accessor :name, :possible
-
-  def initialize(itself="r")
-    #Sets the possible list, and the self.name
-    #lowercase letters are the unchanged letters, upcase is solved letters
-    if itself == "'" || itself == '-'
-      @name = itself
-      @possible = Set[itself]
-      @possible.freeze
-    else
-      @name = itself.downcase
-      @possible = Set.new
-      @possible = %w[ E T A O I N S H R D L C U M W F G Y P B V K J X Q Z ]
-      @possible.delete(itself.upcase)
-    end
-  end
-
-end
-
-class Word
-  attr_accessor :name, :uniques, :u_length, :length, :possibles, :pattern_value
-
-  def initialize(name="test", dictionary)
-    @name = name
-    @uniques = unique_ify(name)
-    @length = @name.length
-    @u_length = @uniques.length
-    @pattern_value = pattern_check(name)
-    @possibles = find_possibles(dictionary)
-  end
-
-  def find_possibles(dictionary)
-    p = Array.new
-    dictionary[@length].each { |k, v|
-      if k.length == @length && v == @u_length  #&& @pattern_value == pattern_check(k)
-        p << k
-
-      end
-    }
-    p.keep_if { |x| 
-      pattern_check(x) == @pattern_value
-    }
-    return p
+    }      
+    # @let_list.merge!({'\'' => Letter.new('\'')})
+    # @let_list.merge!({'-' => Letter.new('-')})
   end
 
 end
