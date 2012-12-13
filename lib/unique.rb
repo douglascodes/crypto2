@@ -1,3 +1,5 @@
+require 'radix'
+
 module Unique
   def unique_ify(word)
     if word.length < 2 then return word end 
