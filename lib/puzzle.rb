@@ -1,6 +1,6 @@
 class Puzzle
   attr_accessor :crypto, :crypto_broken, :solution, :author_sol, :author, :publ_date, :solve_time,
-    :uniques, :full_uniques, :let_list, :author_broken
+    :uniques, :full_uniques, :let_list, :author_broken, :full_broken
   def initialize(crypto='ABCDEF', author="Bace Troncons", publ_date=Time.now)
     @crypto = crypto          #The seperated cryptogram from the author section
     @author = author          #The seperated author section for the crpytogram

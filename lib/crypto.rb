@@ -20,7 +20,7 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
     @dicts = set_dicts(@dicts, './data/xresultant.txt')
     @pop_dict = set_dicts(@pop_dict, './data/top10k.txt')
     @name_dict = set_dicts(@name_dict, './data/SMITH.txt')
-    @dict_1k = set_dicts(@name_dict, './data/top_1000.txt')
+    @dict_1k = set_dicts(@dict_1k, './data/top_1000.txt')
   end 
 
   def get_puzzles
@@ -114,8 +114,24 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
   end
 
   def create_solution(puzz)
+    solve_with_whole_words(puzz)
+    solve_with_letters(puzz)
+  end
+
+  def solve_with_whole_words(puzz)
+    puzz.solution = (' ' << puzz.crypto << ' - ' << puzz.author << ' ')
+    puzz.full_broken.reverse!    
+    puzz.full_broken.each {|word|
+      if word.possibles.length < 1 then next end
+      puzz.solution.gsub!('-'+word.name+' ', '-'+word.possibles.first.to_s+' ')      
+      puzz.solution.gsub!(' '+word.name+'-', ' '+word.possibles.first.to_s+'-')      
+      puzz.solution.gsub!(' '+word.name+' ', ' '+word.possibles.first.to_s+' ')      
+    }
+    puzz.solution.strip!
+  end
+  
+  def solve_with_letters(puzz)
     mask = %w[ E T A O I N S H R D L C U M W F G Y P B V K J X Q Z ' -]
-    puzz.solution = (puzz.crypto << ' - ' << puzz.author)
     @let_list.each { |k, v|
       if v.possible.frozen? then next end
       if v.possible.empty? then next end
@@ -130,10 +146,12 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
     c = puzz.crypto_broken
     a = puzz.author_broken
     c.map! {|x| 
-      r = Word.new(x,@pop_dict)
-      if r.possibles == nil then r = Word.new(r.name,@dicts) end
-        x = r
+      # r = Word.new(x,@pop_dict)
+      # if r.possibles == nil then r = Word.new(r.name, @dicts) end
+         # x = r
+      x = Word.new(x, @dicts)
     }
+
     a.map! {|x| 
       x = Word.new(x, @name_dict)
     }
@@ -144,6 +162,7 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
     }
 
     c += a
+    
     # Now that the author section and crypto section have word objects with each's own dictionary
     # we can work on them in the same way.
 
@@ -156,9 +175,44 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
         work_the_word(x, word)
         }
       end
-    end
+      
+      if z >= 3
+        kill_singles()
+        c.each { |word|
+          if word.possibles.length > 0 then reverse_lookup(word) end
+          }
+      end
     
+      if z >= 4
+        run_smaller_dictionaries(c)
+      end
+    end
+    puzz.full_broken = c
     puzz.let_list = @let_list
+  end
+
+  def run_smaller_dictionaries(broken)
+    broken.each { |word| 
+      if word.possibles.length < 2 then next end 
+    }
+  end
+
+  def kill_singles()
+    singulars = Set.new
+    
+    @let_list.each_value { |l|
+      if l.possible.frozen? then next end
+      if l.possible.length == 1 then singulars << l.possible.first end
+    }
+
+  singulars.each { |s|
+    @let_list.each_value { |l|
+      if l.possible.length == 1 then next end
+      if l.possible.include? s then l.possible.delete(s) end
+    }
+  }
+
+
   end
 
   def work_the_word(x, word)
