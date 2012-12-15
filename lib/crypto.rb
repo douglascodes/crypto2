@@ -13,18 +13,20 @@ include REXML
 include ActionView::Helpers::SanitizeHelper
 
 class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Saves em.
-  attr_accessor :p_list, :solved, :let_list, :dicts, :dicts_big, :name_dict, :pop_dict
+  attr_accessor :p_list, :solved, :let_list, :dicts, :name_dict, :pop_dict, :dict_1k
   def initialize
     @p_list = get_puzzles() #List of puzzle objects
     @solved = 0             #Simple enumerator for number of solved puzzles
     @dicts = set_dicts(@dicts, './data/xresultant.txt')
-    @pop_dict = set_popular()
-    @name_dict = set_dicts(@dicts, './data/SMITH.txt')
+    @pop_dict = set_dicts(@pop_dict, './data/top10k.txt')
+    @name_dict = set_dicts(@name_dict, './data/SMITH.txt')
+    @dict_1k = set_dicts(@name_dict, './data/top_1000.txt')
   end 
 
   def get_puzzles
     #Loads puzzles for the solver class to work on
-    f = REXML::Document.new(get_feed())
+    # f = REXML::Document.new(get_feed())
+    f = REXML::Document.new(File.open('./data/test.xml'))
     r = f.root
     return conform_puzzles(r)
   end
@@ -39,32 +41,7 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
   def set_dicts(dicts, source='./data/xresultant.txt')
     words = []
     add_to_word_list(words, source)
-    dicts = Array.new(20)
-    words.each { |w|
-      w.chomp!
-      w.upcase!
-      add_word(w, dicts)
-    }
-    return dicts
-  end
-
-  def set_name_dicts(dicts, source='./data/SMITH.txt')
-    words = []
-    add_to_word_list(words, source)
-    dicts = Array.new(20)
-    words.each { |w|
-      w.chomp!
-      w.upcase!
-      add_word(w, dicts)
-    }
-    return dicts
-  end
-
-
-  def set_popular(source='./data/top10k.txt')
-    words = []
-    add_to_word_list(words, source)
-    dicts = Array.new(20)
+    dicts = Array.new(28)
     words.each { |w|
       w.chomp!
       w.upcase!
@@ -125,6 +102,7 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
          solve(p)
          create_solution(p)
          puts p.solution
+         binding.pry
       else
         @p_list.each { |p|
          solve(p)
@@ -151,47 +129,44 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
   def solve(puzz)
     c = puzz.crypto_broken
     a = puzz.author_broken
-    c.map! {|x| x = Word.new(x,@dicts)}
-   
-    a.map! {|x| x = Word.new(x,@name_dict)}
-    
+    c.map! {|x| 
+      r = Word.new(x,@pop_dict)
+      if r.possibles == nil then r = Word.new(r.name,@dicts) end
+        x = r
+    }
+    a.map! {|x| 
+      x = Word.new(x, @name_dict)
+    }
+
+    a.each { |x|
+      #Allows single letters in the author section to be any standard initial. "I M Pei" for ex.
+      if x.length == 1 then x.possibles = *('A'..'Z') end
+    }
+
+    c += a
+    # Now that the author section and crypto section have word objects with each's own dictionary
+    # we can work on them in the same way.
+
     set_letters(puzz.full_uniques)
     
-    for z in 1..3
+    for z in 1..5
     
       for x in 1..c[-1].length
       c.each { |word|
-        if word.u_length > x then next end
-        if word.possibles.length > 0 
-          reverse_lookup(word)
-          condense_true(word.uniques, word.possibles)           
-        end
+        work_the_word(x, word)
         }
       end
-    
-      for x in 2..a[-1].length
-      a.each { |word|
-        if word.u_length > x then next end
-        if word.length < 2 then next end
-        if word.possibles.length > 0 
-          reverse_lookup(word)
-          condense_true(word.uniques, word.possibles)           
-        end
-        }
-      end
-
-      # if z == 2
-      #   c.each { |word|
-      #     if word.possibles.length < 3 then next end
-      #     word.possibles.keep_if { |w|
-      #       poss(w, @pop_dict)
-      #     }
-      #     condense_true(word.uniques, word.possibles)           
-      #   }
-      # end
     end
     
     puzz.let_list = @let_list
+  end
+
+  def work_the_word(x, word)
+    if word.u_length > x then return end
+      if word.possibles.length > 0 
+        reverse_lookup(word)
+        if word.possibles.length > 0 then condense_true(word.uniques, word.possibles) end
+      end
   end
 
   def reverse_lookup(word)
@@ -232,7 +207,6 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
     return false
   end
 
-
   def set_letters(salt)
     #Creates an alphabetical list of LETTER objects
     @let_list = Hash.new
@@ -242,5 +216,4 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
     # @let_list.merge!({'\'' => Letter.new('\'')})
     # @let_list.merge!({'-' => Letter.new('-')})
   end
-
 end

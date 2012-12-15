@@ -12,17 +12,18 @@ class Word
 
   def find_possibles(dictionary)
     p = Array.new
-    
-    dictionary[@length].each { |k, v|
-      if k.length == @length && v == @u_length  #&& @pattern_value == pattern_check(k)
-        p << k
+    if dictionary[@length]
+      dictionary[@length].each { |k, v|
+        if k.length == @length && v == @u_length  #&& @pattern_value == pattern_check(k)
+          p << k
 
-      end
-    }
-    p.keep_if { |x| 
-      pattern_check(x) == @pattern_value
-    }
-    return p
+        end
+      }
+      p.keep_if { |x| 
+        pattern_check(x) == @pattern_value
+      }
+      return p
+    end
   end
 
 end
