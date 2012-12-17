@@ -33,9 +33,9 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
 
   def get_feed(xmlfeed='http://www.threadbender.com/rss.xml')
     #Downloads an XML feed. The default is the test one.
-      feed = URI(xmlfeed)
-      feed = Net::HTTP.get(feed)
-      return feed
+    feed = URI(xmlfeed)
+    feed = Net::HTTP.get(feed)
+    return feed
   end
 
   def set_dicts(dicts, source='./data/xresultant.txt')
@@ -56,7 +56,7 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
   end
 
   def add_word(w, dicts)
-       #Removes the roman numerals starting with X. Not needed
+      #Removes the roman numerals starting with X. Not needed
       dicts[w.length] ||= Hash.new
       if dicts[w.length].has_key?(w) then return end
       dicts[w.length].merge!({w => unique_ify(w).length})
@@ -101,6 +101,7 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
         p = @p_list[which]
          solve(p)
          create_solution(p)
+         puts p.crypto + ' - '+ p.author         
          puts p.solution
          binding.pry
       else
@@ -108,6 +109,7 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
          solve(p)
          create_solution(p)
          p.set_solve_date
+         puts p.crypto + ' - '+ p.author         
          puts p.solution
       }
       end
@@ -142,7 +144,7 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
     }
   end
 
-  def solve(puzz)
+  def setup_solve(puzz)
     c = puzz.crypto_broken
     a = puzz.author_broken
     c.map! {|x| 
@@ -150,6 +152,11 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
       # if r.possibles == nil then r = Word.new(r.name, @dicts) end
          # x = r
       x = Word.new(x, @dicts)
+    }
+
+    c.each {|x| 
+      if x.possibles.length > 0 then next end
+      x = Word.new(x.name, @name_dict)
     }
 
     a.map! {|x| 
@@ -165,10 +172,14 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
     
     # Now that the author section and crypto section have word objects with each's own dictionary
     # we can work on them in the same way.
-
     set_letters(puzz.full_uniques)
-    
-    for z in 1..5
+    return c
+  end
+
+  def solve(puzz)
+    c = setup_solve(puzz)
+
+    for z in 1..6
     
       for x in 1..c[-1].length
       c.each { |word|
@@ -183,18 +194,32 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
           }
       end
     
-      if z >= 4
-        run_smaller_dictionaries(c)
+      if z == 3
+        run_smaller_dictionaries(c - puzz.author_broken, @pop_dict)
+      end
+      if z == 4
+        run_smaller_dictionaries(c - puzz.author_broken, @dict_1k)
       end
     end
     puzz.full_broken = c
     puzz.let_list = @let_list
   end
 
-  def run_smaller_dictionaries(broken)
+  def run_smaller_dictionaries(broken, dict)
     broken.each { |word| 
-      if word.possibles.length < 2 then next end 
+      if word.possibles.length < 2 then next end
+        word.possibles = try_dictionary(word, dict)
+        condense_true(word.uniques, word.possibles)   
     }
+  end
+
+  def try_dictionary(w, a)
+    p = w.possibles.dup
+    w.possibles = w.find_possibles(a)
+    reverse_lookup(w)
+    if w.possibles.length < 1 then return p end
+    condense_true(w.uniques, w.possibles)
+    return w.possibles   
   end
 
   def kill_singles()
@@ -205,14 +230,12 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
       if l.possible.length == 1 then singulars << l.possible.first end
     }
 
-  singulars.each { |s|
-    @let_list.each_value { |l|
-      if l.possible.length == 1 then next end
-      if l.possible.include? s then l.possible.delete(s) end
+    singulars.each { |s|
+      @let_list.each_value { |l|
+        if l.possible.length == 1 then next end
+        if l.possible.include? s then l.possible.delete(s) end
+      }
     }
-  }
-
-
   end
 
   def work_the_word(x, word)
