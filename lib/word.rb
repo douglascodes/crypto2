@@ -6,7 +6,7 @@ class Word
     @uniques = unique_ify(name)
     @length = @name.length
     @u_length = @uniques.length
-    @pattern_value = pattern_check(name)
+    @pattern_value = pattern_create(name)
     @possibles = find_possibles(dictionary)
   end
 
@@ -14,13 +14,13 @@ class Word
     p = Array.new
     if dictionary[@length]
       dictionary[@length].each { |k, v|
-        if k.length == @length && v == @u_length  #&& @pattern_value == pattern_check(k)
+        if k.length == @length && v == @u_length  #&& @pattern_value == pattern_create(k)
           p << k
 
         end
       }
       p.keep_if { |x| 
-        pattern_check(x) == @pattern_value
+        pattern_create(x) == @pattern_value
       }
       return p
     end

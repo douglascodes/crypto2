@@ -7,7 +7,7 @@ let(:ts) { Solver.new }
 let(:test_feed) { Document.new(ts.get_feed('http://threadbender.com/rss.xml')) }
 let(:test_root) { test_feed.root }
 
-  it { should respond_to(:p_list, :solved, :let_list, :dicts, :dicts_big)}
+  it { should respond_to(:p_list, :solved, :let_list, :dicts, :name_dict, :pop_dict, :dict_1k)}
 
   it "should read the XML stream items" do
     test_root.each_element('//item') { |item|
@@ -138,42 +138,3 @@ let(:test_root) { test_feed.root }
 
 end
 
-describe Puzzle do
-
-  it { should respond_to(:crypto, :crypto_broken, :solution, :author_sol, :author, :publ_date, :solve_time,
-    :uniques, :full_uniques)}
-
-
-  it "should intiate with Crypto/Author/Date" do
-    p = Puzzle.new("H TJAHJBJ IOFI VWFMUJK IMVIO FWK VWXLWKHIHLWFA ALBJ SHAA OFBJ IOJ DHWFA SLMK HW MJFAHIN. IOFI HP SON MHZOI, IJUYLMFMHAN KJDJFIJK, HP PIMLWZJM IOFW JBHA IMHVUYOFWI",
-    "UFMIHW AVIOJM GHWZ CM",
-    Date.parse("Thu, 27 Sep 2012 23:45:00 -0400"))
-    p.should be_true
-    p.publ_date.should be_true
-    p.crypto.should be_true
-    p.author.should be_true
-  end
-
-  it "should have a list of unique letters" do
-    p = Puzzle.new("ABCDDDDDD",
-      "DDDEEEEEF",
-      Date.parse("Thu, 27 Sep 2012 23:45:00 -0400"))
-    p.uniques.should be_true
-    p.uniques.should be == "ABCD"
-    p.uniques.length.should eq(4)
-    p.full_uniques.length.should eq(6)
-  end
-
-end
-
-
-describe Letter do
-  
-  let(:lett) { Letter.new("r")}
-  it { should respond_to(:name, :possible)}
-  
-  it "should not have itself in possible list" do
-    lett.possible.should_not include(lett.name.upcase)
-  end
-
-end

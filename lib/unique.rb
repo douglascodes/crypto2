@@ -1,6 +1,8 @@
 require 'radix'
+require 'base64'
 
 module Unique
+
   def unique_ify(word)
     if word.length < 2 then return word end 
     u = ''
@@ -11,7 +13,7 @@ module Unique
     return u
   end
 
-  def pattern_check(string)
+  def pattern_create(string)
     s = string.split("")
     h = Hash.new
     s.map! { |x| Base64.encode64(x)}
@@ -26,5 +28,9 @@ module Unique
     }
     s.map! { |x| x = h[x] }
     return s
+  end
+
+  def pattern_match?(a, b)
+    return pattern_create(a) == pattern_create(b)
   end
 end
