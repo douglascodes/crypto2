@@ -4,20 +4,20 @@ include Unique
 
 describe Unique do 
 
-	Word = Struct.new(:name, :length, :u_length, :uniques, :pattern)
+	Test_U_Word = Struct.new(:name, :length, :u_length, :uniques, :pattern)
 	x = "tasty"
-	let(:word) { Word.new(x, x.length, 4, "tasy", nil)}
-	subject { word }
+	let(:test_u_word) { Test_U_Word.new(x, x.length, 4, "tasy", nil)}
+	subject { test_u_word }
 
 	it  { should respond_to(:name, :length, :u_length, :uniques, :pattern)}
 	
 	it "should convert a string to a set of uniques" do
-		unique_ify("tasty").should eq(word.uniques)
+		unique_ify("tasty").should eq(test_u_word.uniques)
 	end
 
 	it "should be able to create patterns" do
-		word.pattern = pattern_create(word.name)
-		word.pattern.should eq(pattern_create("barbi"))
+		test_u_word.pattern = pattern_create(test_u_word.name)
+		test_u_word.pattern.should eq(pattern_create("barbi"))
 		pattern_match?("abc", "abb").should be_false
 		pattern_match?("aaron", "bblzn").should be_true
 		pattern_match?("lincoln", "Lincoln").should be_false
