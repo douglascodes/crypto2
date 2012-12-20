@@ -26,6 +26,9 @@ subject {test_solver}
 
   it "should have a 4 dictionaries" do
     test_solver.pop_dict[6].values.length.should be > 1100
+    test_solver.dicts[6].values.length.should be > 100
+    test_solver.name_dict[6].values.length.should be > 100
+    test_solver.dict_1k[6].values.length.should be > 20
   end
 
   it "should create A list of puzzle objects" do
@@ -41,7 +44,7 @@ subject {test_solver}
     test_solver.p_list[0].crypto.should be_true
   end
 
-  it "should split the string at the /[?.!] -/ point" do
+  it 'should split the string at the /[.?!]"* - / point' do
     a, b = test_solver.seperate_author("UWDC W FXWYFC! WII IREC RA W FXWYFC. UXC QWY LXB MBCA EVZUXCAU RA MCYCZWIIH UXC BYC LXB RA LRIIRYM UB TB WYT TWZC. - TWIC FWZYCMRC")
     a.should eq("UWDC W FXWYFC WII IREC RA W FXWYFC UXC QWY LXB MBCA EVZUXCAU RA MCYCZWIIH UXC BYC LXB RA LRIIRYM UB TB WYT TWZC".downcase)
     b.should eq("TWIC FWZYCMRC".downcase)
@@ -57,6 +60,25 @@ subject {test_solver}
     puzz.crypto_broken[2].length.should <= puzz.crypto_broken[3].length
     puzz.crypto_broken[3].length.should <= puzz.crypto_broken[4].length
   end
+
+  it "should kill the singular letters without remorse" do
+    test_solver.set_letters([*('a'..'z')].join)
+    test_solver.let_list['g'].possible = %w[R]
+    test_solver.kill_singles()
+    single_test_count = 0
+    test_solver.let_list.each_value { |letter_test| 
+      if letter_test.possible.include? 'R' then single_test_count += 1 end
+    }
+
+    single_test_count.should eq(1)
+  end
+
+  it "should return letter objects from the let_list hash" do
+    test_solver.set_letters([*('a'..'z')].join)
+    test_solver.let_list['g'].should be_kind_of(Letter) 
+    test_solver.let_list['g'].should respond_to(:name, :possible)
+  end
+
 
 end
 
