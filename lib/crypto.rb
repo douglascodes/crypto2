@@ -1,12 +1,12 @@
-require 'net/http'
-require 'rexml/document'
-require 'action_view'
-require 'date'
-require 'pry'
-require './lib/unique'
-require './lib/word'
-require './lib/letter'
-require './lib/puzzle'
+require  'net/http'
+require  'rexml/document'
+require  'action_view'
+require  'date'
+require  'pry'
+require  './lib/unique'
+require  './lib/word'
+require  './lib/letter'
+require  './lib/puzzle'
 # require 'puzzle'
 include Unique
 include REXML
@@ -18,9 +18,13 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
     @p_list = get_puzzles() #List of puzzle objects
     @solved = 0             #Simple enumerator for number of solved puzzles
     @dicts = set_dicts(@dicts, './data/xresultant.txt')
+    @dicts[0] = "Fullsize Dictionary"
     @pop_dict = set_dicts(@pop_dict, './data/top10k.txt')
+    @pop_dict[0] = "Top 10,000 Words"
     @name_dict = set_dicts(@name_dict, './data/SMITH.txt')
+    @name_dict[0] = "Proper Names Dictionary"
     @dict_1k = set_dicts(@dict_1k, './data/top_1000.txt')
+    @dict_1k[0] = "Pimsleur top 1k" 
   end 
 
   def get_puzzles
@@ -247,6 +251,7 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
   end
 
   def reverse_lookup(word)
+    # if word.possibles.empty? then return end
     word.possibles.keep_if { |x|
       char_matcher(word.name, x)
     }
@@ -254,6 +259,7 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
   end
 
   def char_matcher(w, p)
+    if w.length != p.length then return end
     counter = w.length-1
     for x in 0..counter
       if @let_list[w[x]].possible.include?(p[x]) then next end

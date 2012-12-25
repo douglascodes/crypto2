@@ -6,6 +6,7 @@ describe Solver do
 let(:test_solver) { Solver.new }
 let(:test_feed) { Document.new(test_solver.get_feed('http://threadbender.com/rss.xml')) }
 let(:test_root) { test_feed.root }
+
 subject {test_solver}
 
   it { should respond_to(:p_list, :solved, :let_list, :dicts, :name_dict, :pop_dict, :dict_1k)}
@@ -35,7 +36,6 @@ subject {test_solver}
     test_solver.p_list = test_solver.conform_puzzles(test_root)
     test_solver.p_list[0].should be_an_instance_of(Puzzle)
   end
-
 
   it "should create puzzle objects with Crypto/Author/Date attribs" do
     test_solver.p_list = test_solver.conform_puzzles(test_root)
@@ -79,6 +79,23 @@ subject {test_solver}
     test_solver.let_list['g'].should respond_to(:name, :possible)
   end
 
+  it "should be able to switch a dictionary for a word" do
+    subject.set_letters(subject.p_list[4].full_uniques)
+    solver_test_word = subject.p_list[4].crypto_broken[-1]
+    solver_test_word = Word.new(solver_test_word, subject.dicts)
+
+    stw_pos_len = solver_test_word.possibles.length
+    solver_test_word.possibles = subject.try_dictionary(solver_test_word, subject.name_dict)
+    stw_pos_len.should_not eq(solver_test_word.possibles.length)
+ 
+    solver_test_word.possibles = subject.try_dictionary(solver_test_word, subject.pop_dict)
+    stw_pos_len.should_not eq(solver_test_word.possibles.length)
+  end
+
+
+  it "should work words of the proper length, resulting in reduced possibilities" do
+    # test_solver.target.should equal(value)      
+  end
 
 end
 

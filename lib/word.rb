@@ -1,5 +1,5 @@
 class Word
-  attr_accessor :name, :uniques, :u_length, :length, :possibles, :pattern_value
+  attr_accessor :name, :uniques, :u_length, :length, :possibles, :pattern_value, :current_dict
 
   def initialize(name="test", dictionary)
     @name = name
@@ -8,6 +8,16 @@ class Word
     @u_length = @uniques.length
     @pattern_value = pattern_create(name)
     @possibles = find_possibles(dictionary)
+    @current_dict = dictionary
+  end
+
+  def which_dictionary?
+    return @current_dict[0]
+  end
+
+  def has_possibilities?
+    if @possibles.length < 1 then return false end
+    return true
   end
 
   def find_possibles(dictionary)
