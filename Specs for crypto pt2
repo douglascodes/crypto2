@@ -1,4 +1,0 @@
-Specs for crypto pt2
-
-
-Utilize the current structures in crypto part 1, but substitute the algorithm for generating possibilities to an algorithm for reverse generating from a list of known words. Make sure the words "conform" to the selected letter list via the "compress know letters" method. And adjust the potential list versus the known after the potentials is updated. This should be a simple change, the letter objects remain the same, most algorithms remain the same, BUT the only difference is in the mass BRUTE FORCE generation of word objects. Rather than wasting time cycling through known failures, start with known successes and go no further. Check that each POSITIONAL character succedes with its compatriots, and then use that "Potentials list" in the current structure.
