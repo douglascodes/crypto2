@@ -17,46 +17,39 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
   def initialize
     @p_list = get_puzzles() #List of puzzle objects
     @solved = 0             #Simple enumerator for number of solved puzzles
-    @dicts = set_dicts(@dicts, './data/xresultant.txt')
-    @dicts[0] = "Fullsize Dictionary"
-    @pop_dict = set_dicts(@pop_dict, './data/top10k.txt')
-    @pop_dict[0] = "Top 10,000 Words"
-    @name_dict = set_dicts(@name_dict, './data/SMITH.txt')
-    @name_dict[0] = "Proper Names Dictionary"
-    @dict_1k = set_dicts(@dict_1k, './data/top_1000.txt')
-    @dict_1k[0] = "Pimsleur top 1k" 
+    @dicts = set_dicts(@dicts, './data/xresultant.txt', "Fullsize Dictionary")
+    @pop_dict = set_dicts(@pop_dict, './data/top10k.txt', "Top 10,000 Words")
+    @name_dict = set_dicts(@name_dict, './data/SMITH.txt', "Proper Names Dictionary")
+    @dict_1k = set_dicts(@dict_1k, './data/top_1000.txt', "Pimsleur top 1k")
   end 
 
   def get_puzzles
     #Loads puzzles for the solver class to work on
-    # f = REXML::Document.new(get_feed())
-    f = REXML::Document.new(File.open('./data/test.xml'))
-    r = f.root
-    return conform_puzzles(r)
+    # r = (REXML::Document.new(get_feed())).root
+    d = (REXML::Document.new(File.open('./data/test.xml')))
+    return conform_puzzles(d)
   end
 
   def get_feed(xmlfeed='http://www.threadbender.com/rss.xml')
     #Downloads an XML feed. The default is the test one.
-    feed = URI(xmlfeed)
-    feed = Net::HTTP.get(feed)
-    return feed
+    return Net::HTTP.get(URI(xmlfeed))
   end
 
-  def set_dicts(dicts, source='./data/xresultant.txt')
-    words = []
+  def set_dicts(dicts, source='./data/xresultant.txt', dict_name="Test Dictionary")
+    words = Array.new
     add_to_word_list(words, source)
     dicts = Array.new(28)
     words.each { |w|
-      w.chomp!
+      w.strip!
       w.upcase!
       add_word(w, dicts)
     }
+    dicts[0] = dict_name
     return dicts
   end
 
   def add_to_word_list(w_array, file)
-    f = IO.readlines(file)
-    w_array.concat(f)
+    w_array.concat(IO.readlines(file))
   end
 
   def add_word(w, dicts)
@@ -66,23 +59,18 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
       dicts[w.length].merge!({w => unique_ify(w).length})
   end
 
-  def conform_puzzles(root)
+  def conform_puzzles(doc)
     #Strips XML tags and creates a list of Puzzle objects
     p_list = Array.new
-    root.each_element('//item') { |item|
-      desc, author, date = break_up_puzzle(item)  #Seperates the extracted puzzle into three parts
-      p_list << Puzzle.new(desc, author, date)
+    doc.each_element("//item") { |e| 
+      date = author = desc = nil
+      date = Date.parse(strip_tags(e.elements['pubDate'].to_s))
+      desc, author = seperate_author(strip_tags(e.elements['description'].to_s))
+        if desc && author && date
+          p_list << Puzzle.new(desc, author, date)
+        end
     }
     return p_list
-  end
-
-  def break_up_puzzle(p)
-    desc = p.delete_element('description').to_s
-    desc = strip_tags(desc)
-    desc, author = seperate_author(desc)
-    date = p.delete_element('pubDate').to_s
-    date = Date.parse(strip_tags(date))
-    return desc, author, date
   end
 
   def seperate_author(unbroken)
@@ -126,7 +114,7 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
 
   def solve_with_whole_words(puzz)
     puzz.solution = (' ' << puzz.crypto << ' - ' << puzz.author << ' ')
-    puzz.full_broken.reverse!    
+    # puzz.full_broken.reverse!    
     puzz.full_broken.each {|word|
       if word.possibles.length < 1 then next end
       puzz.solution.gsub!('-'+word.name+' ', '-'+word.possibles.first.to_s+' ')      
@@ -151,12 +139,7 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
   def setup_solve(puzz)
     c = puzz.crypto_broken
     a = puzz.author_broken
-    c.map! {|x| 
-      # r = Word.new(x,@pop_dict)
-      # if r.possibles == nil then r = Word.new(r.name, @dicts) end
-         # x = r
-      x = Word.new(x, @dicts)
-    }
+    c.map! {|x| x = Word.new(x, @dicts)}
 
     c.each {|x| 
       if x.possibles.length > 0 then next end
@@ -251,7 +234,7 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
   end
 
   def reverse_lookup(word)
-    # if word.possibles.empty? then return end
+    # Only keeps the words.possibles if they match the current letter set's possiblities
     word.possibles.keep_if { |x|
       char_matcher(word.name, x)
     }
@@ -259,44 +242,40 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
   end
 
   def char_matcher(w, p)
-    if w.length != p.length then return end
-    counter = w.length-1
-    for x in 0..counter
-      if @let_list[w[x]].possible.include?(p[x]) then next end
-      return false
+    if w.length != p.length then return false end   #If for some reason the lengths don't match returns FALSE
+    counter = w.length-1 #Compensates for the array starting at ZERO
+    for x in 0..counter   # Spies across the full length of each word trying to match key letter objects to possbiles
+      if @let_list[w[x]].possible.include?(p[x]) then next end  #It IS possbile so continue
+      return false #This key letter can't be found in the possible solutions
     end
-    return true
+    return true   # After checking each character we have no failures of match, so it returns TRUE
   end
 
   def condense_true(key, p_words)
-    #For creating an array for each unique letter containing one of each possibility
-    #the possible letters will shrink each time a word is tested. Till all contain just one
-    #possiblity... or hilarity will ensue in having a cryptogram with an alternate possibility
-    words = p_words.map { |w| unique_ify(w) }
-
-    for position in 0..key.length-1
-      letter = @let_list[key[position]]
-      if letter.possible.frozen? then next end
-      letter.possible.clear
-      words.each { |word|
+    # Uses the key words unique letters to match against the matching possbilities. Those are reset to 
+    # a new possibles list for each letter.
+    words = p_words.map { |w| unique_ify(w) }     #Its repetitious to try duplicate characters
+                                                  # so we just work with the unique letters
+                                                  
+    for position in 0..key.length-1         # POSITION is the spot in both words
+      letter = @let_list[key[position]]     #retrieves the letter OBJ for that position
+      if letter.possible.frozen? then next end # ' AND - are ignored
+      letter.possible.clear     # Resets the letter.possible list
+      words.each { |word|       # Chunks down on 
         if letter.possible.include?(word[position]) then next end
-        letter.possible << word[position]
+        letter.possible << word[position] 
       }
     end
   end
 
-  def poss(word, dict)
-    if dict[word.length].key?(word) then return true end
-    return false
-  end
-
   def set_letters(salt)
-    #Creates an alphabetical list of LETTER objects
-    @let_list = Hash.new
+    # Creates a list of letter objects, and includes apostrophes and hypens.
+    # SALT is derived from the unique characters of the puzzle, excluding SPACES
+    @let_list = Hash.new    #Sets the empty hash for letter objects
     salt.chars { |l| 
         @let_list.merge!({l => Letter.new(l)})
+        # Uses the key_letter (lowercase) for each character as the HASHkey.
+        # The value is the letter object created in the Letter.rb file.
     }      
-    # @let_list.merge!({'\'' => Letter.new('\'')})
-    # @let_list.merge!({'-' => Letter.new('-')})
-  end
+    end
 end

@@ -4,7 +4,8 @@ require 'spec_helper'
 describe Solver do
 
 let(:test_solver) { Solver.new }
-let(:test_feed) { Document.new(test_solver.get_feed('http://threadbender.com/rss.xml')) }
+# let(:test_feed) { Document.new(test_solver.get_feed('http://threadbender.com/rss.xml')) }
+let(:test_feed) { REXML::Document.new(File.open('./data/test.xml')) }
 let(:test_root) { test_feed.root }
 
 subject {test_solver}
@@ -27,7 +28,7 @@ subject {test_solver}
 
   it "should have a 4 dictionaries" do
     test_solver.pop_dict[6].values.length.should be > 1100
-    test_solver.dicts[6].values.length.should be > 100
+    test_solver.dicts[6].values.length.should be > 1100
     test_solver.name_dict[6].values.length.should be > 100
     test_solver.dict_1k[6].values.length.should be > 20
   end
@@ -80,8 +81,8 @@ subject {test_solver}
   end
 
   it "should be able to switch a dictionary for a word" do
-    subject.set_letters(subject.p_list[4].full_uniques)
-    solver_test_word = subject.p_list[4].crypto_broken[-1]
+    subject.set_letters(subject.p_list[5].full_uniques)
+    solver_test_word = subject.p_list[5].crypto_broken[-1]
     solver_test_word = Word.new(solver_test_word, subject.dicts)
 
     stw_pos_len = solver_test_word.possibles.length
