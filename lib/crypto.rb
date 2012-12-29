@@ -165,6 +165,7 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
 
   def solve(puzz)
     c = setup_solve(puzz)
+    # binding.pry
 
     for z in 1..6
     
