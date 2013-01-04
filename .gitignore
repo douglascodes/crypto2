@@ -1,2 +1,2 @@
 autotest/*
-./*.log
+./logs/*

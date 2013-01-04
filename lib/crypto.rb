@@ -95,15 +95,16 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
          create_solution(p)
          puts p.crypto + ' - '+ p.author         
          puts p.solution
-         binding.pry
+      
       else
-        @p_list.each { |p|
-         solve(p)
-         create_solution(p)
-         p.set_solve_date
-         puts p.crypto + ' - '+ p.author         
-         puts p.solution
-      }
+
+        @p_list.each { |puzz| 
+          solve(puzz)
+          create_solution(puzz)
+          puzz.set_solve_date
+          # puts puzz.crypto + ' - '+ puzz.author         
+          puts puzz.solution
+        }
       end
   end
 
@@ -156,7 +157,13 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
     }
 
     c += a
-    
+
+    c.sort!{ |x, y|
+      x.length <=> y.length
+    }  
+
+    # c.each { |e| puts e.name }
+    # binding.pry
     # Now that the author section and crypto section have word objects with each's own dictionary
     # we can work on them in the same way.
     set_letters(puzz.full_uniques)
@@ -168,24 +175,22 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
     # binding.pry
 
     for z in 1..6
-    
-      for x in 1..c[-1].length
-      c.each { |word|
-        work_the_word(x, word)
-        }
-      end
-      
-      if z >= 3
+
+      c.cycle(5) { |word|
+      work_the_word(word)
+      }
+
+      if z >= 2
         kill_singles()
         c.each { |word|
           if word.possibles.length > 0 then reverse_lookup(word) end
           }
       end
     
-      if z == 3
+      if z == 4
         run_smaller_dictionaries(c - puzz.author_broken, @pop_dict)
       end
-      if z == 4
+      if z == 5
         run_smaller_dictionaries(c - puzz.author_broken, @dict_1k)
       end
     end
@@ -211,23 +216,21 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
   end
 
   def kill_singles()
-    singulars = Set.new
+    singulars = Array.new
     
     @let_list.each_value { |l|
       if l.possible.frozen? then next end
       if l.possible.length == 1 then singulars << l.possible.first end
     }
 
-    singulars.each { |s|
-      @let_list.each_value { |l|
-        if l.possible.length == 1 then next end
-        if l.possible.include? s then l.possible.delete(s) end
-      }
+    @let_list.each_value { |l|
+      if l.possible.length == 1 then next end
+      l.possible = l.possible - singulars
     }
   end
 
-  def work_the_word(x, word)
-    if word.u_length > x then return end
+  def work_the_word(word)
+    # if word.length > x then return end
       if word.possibles.length > 0 
         reverse_lookup(word)
         if word.possibles.length > 0 then condense_true(word.uniques, word.possibles) end
@@ -236,14 +239,16 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
 
   def reverse_lookup(word)
     # Only keeps the words.possibles if they match the current letter set's possiblities
+    # word.possibles.keep_if { |x|
+    #   char_matcher(word.name, x)
+    # }
     word.possibles.keep_if { |x|
-      char_matcher(word.name, x)
+      char_matcher(word.uniques, unique_ify(x))
     }
-    # puts word.possibles
   end
 
   def char_matcher(w, p)
-    if w.length != p.length then return false end   #If for some reason the lengths don't match returns FALSE
+    # if w.length != p.length then return false end   #If for some reason the lengths don't match returns FALSE
     counter = w.length-1 #Compensates for the array starting at ZERO
     for x in 0..counter   # Spies across the full length of each word trying to match key letter objects to possbiles
       if @let_list[w[x]].possible.include?(p[x]) then next end  #It IS possbile so continue
@@ -269,6 +274,11 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
     end
   end
 
+  def reload_word_possibles(word)
+    word.reload_possibles
+    reverse_lookup(word)
+  end
+
   def set_letters(salt)
     # Creates a list of letter objects, and includes apostrophes and hypens.
     # SALT is derived from the unique characters of the puzzle, excluding SPACES
@@ -278,5 +288,5 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
         # Uses the key_letter (lowercase) for each character as the HASHkey.
         # The value is the letter object created in the Letter.rb file.
     }      
-    end
+  end
 end

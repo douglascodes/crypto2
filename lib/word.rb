@@ -20,17 +20,18 @@ class Word
     return true
   end
 
+  def reload_possibles
+    @possibles = find_possibles(@current_dict)
+  end
+
   def find_possibles(dictionary)
     p = Array.new
     if dictionary[@length]
       dictionary[@length].each { |k, v|
-        if k.length == @length && v == @u_length  #&& @pattern_value == pattern_create(k)
+        if k.length == @length && v == @u_length && @pattern_value == pattern_create(k)
           p << k
 
         end
-      }
-      p.keep_if { |x| 
-        pattern_create(x) == @pattern_value
       }
       return p
     end
