@@ -95,7 +95,7 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
          create_solution(p)
          puts p.crypto + ' - '+ p.author         
          puts p.solution
-      
+        binding.pry
       else
 
         @p_list.each { |puzz| 
@@ -162,7 +162,6 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
       x.length <=> y.length
     }  
 
-    # c.each { |e| puts e.name }
     # binding.pry
     # Now that the author section and crypto section have word objects with each's own dictionary
     # we can work on them in the same way.
@@ -180,12 +179,10 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
       work_the_word(word)
       }
 
-      if z >= 2
         kill_singles()
         c.each { |word|
           if word.possibles.length > 0 then reverse_lookup(word) end
           }
-      end
     
       if z == 4
         run_smaller_dictionaries(c - puzz.author_broken, @pop_dict)
