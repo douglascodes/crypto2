@@ -102,8 +102,8 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
           solve(puzz)
           create_solution(puzz)
           puzz.set_solve_date
-          # puts puzz.crypto + ' - '+ puzz.author         
-          puts puzz.solution
+          print @p_list.index(puzz), ") ", puzz.crypto + ' - '+ puzz.author, "\n"
+          print @p_list.index(puzz), ") ", puzz.solution, "\n"
         }
       end
   end
@@ -179,20 +179,109 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
       work_the_word(word)
       }
 
+      3.times do
         kill_singles()
+      end
         c.each { |word|
           if word.possibles.length > 0 then reverse_lookup(word) end
           }
-    
+  
       if z == 4
         run_smaller_dictionaries(c - puzz.author_broken, @pop_dict)
       end
-      if z == 5
-        run_smaller_dictionaries(c - puzz.author_broken, @dict_1k)
-      end
+    #   if z == 5
+    #     run_smaller_dictionaries(c - puzz.author_broken, @dict_1k)
+    #   end
     end
     puzz.full_broken = c
     puzz.let_list = @let_list
+  end
+
+  def give_continuity_a_try(p, full_broken)
+    3.times do
+      kill_singles
+    end
+
+    known, unknown = split_letters_to_known_unknown(@let_list)
+    if unknown.empty? then return end
+
+    all_sets_of_letters = Array.new
+    array = create_letter_sets(known, unknown, all_sets_of_letters)
+    return array
+  end
+
+  def create_letter_sets(known, unknown, all_sets_of_letters)
+    base_array_for_letters = Array.new
+    array_of_letters = set_array_of_letters(unknown)
+
+    for horizontal in 0...array_of_letters.length
+      for vertical in 1...array_of_letters[horizontal].length
+        base_array_for_letters << array_of_letters[horizontal][0].name + array_of_letters[horizontal][vertical]
+      end
+    end
+    return base_array_for_letters
+  end
+
+  def combine_arrays_make_unique(array)
+    set_of_letters = Set.new
+    set_of_possibles = Set.new
+    array.each {|e| 
+
+      set_of_letters << e[0] 
+      set_of_possibles << e[1]
+      }
+
+    if set_of_letters.length**set_of_possibles.length > 1000 then return nil end
+
+    array = array.combination(set_of_letters.length).to_a
+
+    array.delete_if { |e| 
+      temp_set_secondary = Set.new
+      temp_set = Set.new
+      e.each { |y| 
+        temp_set << y[0]
+        temp_set_secondary << y[1]
+      }
+      temp_set.length != set_of_letters.length || temp_set_secondary.length != set_of_letters.length
+    }
+    return array
+  end
+
+
+  def set_array_of_letters(unknown)
+    array_of_letters_and_possibles = Array.new
+    
+    unknown.each_value { |v| # V = a letter object containing more than one possibility
+      array_of_letters_and_possibles << [v.dup] + v.possibles.dup
+    }
+    clear_dup_possibles(array_of_letters_and_possibles)
+    return array_of_letters_and_possibles
+  end
+
+  def clear_dup_possibles(array)
+    array.each { |each_set| # Clears the possibles list so we can play with each one at a time.
+      each_set[0].possibles.clear
+    }
+  end
+
+  def split_letters_to_known_unknown(letter_list)
+    known_letters = letter_list.dup
+    unknown_letters = letter_list.dup
+    known_letters.keep_if { |k, v| v.possibles.frozen? }
+    unknown_letters.delete_if { |k, v| v.possibles.frozen? } 
+    return known_letters, unknown_letters
+  end
+
+  def count_words_with_possibles(word_array)
+    return word_array.count { |w| w.possibles.length > 0 }
+  end
+
+  def check_this_letter_set(new_word_array, temp_letter_list, benchmark)
+    new_word_array.each { |w|
+      reverse_lookup(w, temp_letter_list)
+    }
+    if count_words_with_possibles(new_word_array) < benchmark then return false end
+    return true
   end
 
   def run_smaller_dictionaries(broken, dict)
