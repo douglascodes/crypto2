@@ -182,9 +182,10 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
       3.times do
         kill_singles()
       end
-        c.each { |word|
-          if word.possibles.length > 0 then reverse_lookup(word) end
-          }
+
+      c.each { |word|
+        if word.possibles.length > 0 then reverse_lookup(word) end
+        }
   
       if z == 4
         run_smaller_dictionaries(c - puzz.author_broken, @pop_dict)
