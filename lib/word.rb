@@ -12,29 +12,39 @@ class Word
   end
 
   def which_dictionary?
-    return @current_dict[0]
+    @current_dict[0]
   end
 
   def has_possibilities?
-    if @possibles.length < 1 then return false end
-    return true
+#    return false if @possibles == nil
+    @possibles.length > 0
   end
 
   def reload_possibles
     @possibles = find_possibles(@current_dict)
   end
 
+=begin
   def find_possibles(dictionary)
     p = Array.new
     if dictionary[@length]
       dictionary[@length].each { |k, v|
         if k.length == @length && v == @u_length && @pattern_value == pattern_create(k)
           p << k
-
         end
       }
       return p
     end
+  end
+=end
+
+  def find_possibles(dictionary)
+    return [] if dictionary[@length] == nil
+    p = dictionary[@length].dup
+    p.keep_if { |k, v|
+        k.length == @length && v == @u_length && @pattern_value == pattern_create(k)
+        }
+    p.keys
   end
 
 end

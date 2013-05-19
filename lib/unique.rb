@@ -4,10 +4,10 @@ require 'base64'
 module Unique
 
   def unique_ify(word)
-    if word.length < 2 then return word end 
+    if word.length < 2 then return word end
     u = ''
     word.each_char { |c|
-    if u.include? c then next end
+    next if u.include? c
       u << c
     }
     return u
@@ -27,10 +27,9 @@ module Unique
       end
     }
     s.map! { |x| x = h[x] }
-    return s
   end
 
   def pattern_match?(a, b)
-    return pattern_create(a) == pattern_create(b)
+    pattern_create(a) == pattern_create(b)
   end
 end
