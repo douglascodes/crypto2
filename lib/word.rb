@@ -7,29 +7,21 @@ class Word
     @length = @name.length
     @u_length = @uniques.length
     @pattern_value = pattern_create(name)
-    @possibles = find_possibles(dictionary)
     @current_dict = dictionary
+    @possibles = dictionary.find_possible_matches(self)
   end
 
   def which_dictionary?
-    @current_dict[0]
+    @current_dict.name
   end
 
   def has_possibilities?
     @possibles.length > 0
   end
 
-  def reload_possibles
-    @possibles = find_possibles(@current_dict)
-  end
-
-  def find_possibles(dictionary)
-    return [] if dictionary[@length] == nil
-    p = dictionary[@length].dup
-    p.keep_if { |k, v|
-        k.length == @length && v == @u_length && @pattern_value == pattern_create(k)
-        }
-    p.keys
+  def reload_possibles(dictionary)
+    @possibles = dictionary.find_possible_matches(self)
+    @current_dict = dictionary
   end
 
 end
