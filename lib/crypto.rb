@@ -12,9 +12,9 @@ include REXML
 include ActionView::Helpers::SanitizeHelper
 
 class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Saves em.
-  attr_accessor :p_list, :calculations, :let_list, :dicts, :name_dict, :pop_dict, :dict_1k
+  attr_accessor :puzzle_list, :calculations, :let_list, :dicts, :name_dict, :pop_dict, :dict_1k
   def initialize
-    @p_list = get_puzzles() #List of puzzle objects
+    @puzzle_list = get_puzzle_list() #List of puzzle objects
     @calculations = 0             #Simple enumerator for number of calculations puzzles
     @dicts = set_dicts(@dicts, './data/xresultant.txt', "Fullsize Dictionary")
     @pop_dict = set_dicts(@pop_dict, './data/top10k.txt', "Top 10,000 Words")
@@ -22,7 +22,7 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
     @dict_1k = set_dicts(@dict_1k, './data/top_1000.txt', "Pimsleur top 1k")
   end
 
-  def get_puzzles
+  def get_puzzle_list
     #Loads puzzles for the solver class to work on
     # d = (REXML::Document.new(get_feed())).root
     d = (REXML::Document.new(File.open('./data/test.xml')))
@@ -31,9 +31,8 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
 
   def get_feed(xmlfeed='http://www.threadbender.com/rss.xml')
     #Downloads an XML feed. The default is the test one.
-    return Net::HTTP.get(URI(xmlfeed))
+    Net::HTTP.get(URI(xmlfeed))
   end
-
 
   def set_dicts(dicts, source='./data/xresultant.txt', dict_name="Test Dictionary")
     words = Array.new
@@ -58,39 +57,19 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
       dicts[w.length].merge!({w => unique_ify(w).length})
   end
 
-
   def conform_puzzles(doc)
     #Strips XML tags and creates a list of Puzzle objects
-    p_list = Array.new
+    puzzle_list = Array.new
     doc.each_element("//item") { |e|
-      date = author = desc = nil
-      date = Date.parse(strip_tags(e.elements['pubDate'].to_s))
-      desc, author = seperate_author(strip_tags(e.elements['description'].to_s))
-        if desc && author && date
-          p_list << Puzzle.new(desc, author, date)
-        end
+          puzzle_list << Puzzle.new(e)
     }
-    return p_list
-  end
-
-  def seperate_author(unbroken)
-    #Sets puzzle to unsolved letters (downcase) and removes punctuation
-    unbroken.downcase!
-    a, b = unbroken.split(/[.?!]"* - /)
-    # Special thanks to RUBULAR.com
-    # Breaks the puzzle at the Crypto/Author break. Author starts with" -"
-    # Sentence ends with punctuation. So "! -", ". -", '?" -' all must be accounted
-    a.delete!(".,!?:;&()")
-    a.strip!
-    b.delete!(".,!?:;&()")
-    b.strip!
-    return a, b
+    return puzzle_list
   end
 
   def go_to_work(which=nil)
     #takes the passed argument from main.rb
       if which
-        p = @p_list[which]
+        p = @puzzle_list[which]
          solve(p)
          create_solution(p)
          puts p.crypto + ' - '+ p.author
@@ -98,10 +77,10 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
         binding.pry
       else
 
-        @p_list.each { |puzz|
+        @puzzle_list.each { |puzz|
           solve(puzz)
           create_solution(puzz)
-          puzz.set_solve_date
+          puzz.set_solve_time
           print puzz.solution, "\n"
 #          print @calculations, ": Calculations\n"
           }

@@ -12,5 +12,4 @@ describe Letter do
   it "should not have itself in possible list" do
     lett.possible.should_not include(lett.name.upcase)
   end
-
 end
