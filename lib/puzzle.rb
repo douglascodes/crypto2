@@ -4,13 +4,13 @@ include REXML
 include ActionView::Helpers::SanitizeHelper
 
 class Puzzle
-  attr_accessor :crypto, :crypto_broken, :solution, :author_sol, :author, :publ_date, :solve_time,
-    :uniques, :full_uniques, :let_list, :author_broken, :full_broken
+  attr_accessor :crypto, :crypto_broken, :solution, :author_solution, :author, :publ_date, :solve_time,
+    :uniques, :full_uniques, :letter_list, :author_broken, :full_broken
 
   def initialize(xml_object)
       date = nil
-      @publ_date = Date.parse(strip_tags(xml_object.elements['pubDate'].to_s))
-      @crypto, @author = seperate_author(strip_tags(xml_object.elements['description'].to_s))
+      @publ_date = Date.parse(xml_object.elements['pubDate'].text)
+      @crypto, @author = seperate_author(xml_object.elements['description'].text)
     @uniques = unique_ify(@crypto)
     @full_uniques = unique_ify((@crypto + @author)).delete(" ")
     set_up_puzzle()

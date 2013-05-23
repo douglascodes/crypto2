@@ -12,14 +12,14 @@ include REXML
 include ActionView::Helpers::SanitizeHelper
 
 class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Saves em.
-  attr_accessor :puzzle_list, :calculations, :let_list, :dicts, :name_dict, :pop_dict, :dict_1k
+  attr_accessor :puzzle_list, :calculations, :letter_list, :full_dictionary, :proper_name_dictionary, :popular_dictionary, :top_1000_words
   def initialize
     @puzzle_list = get_puzzle_list() #List of puzzle objects
     @calculations = 0             #Simple enumerator for number of calculations puzzles
-    @dicts = set_dicts(@dicts, './data/xresultant.txt', "Fullsize Dictionary")
-    @pop_dict = set_dicts(@pop_dict, './data/top10k.txt', "Top 10,000 Words")
-    @name_dict = set_dicts(@name_dict, './data/SMITH.txt', "Proper Names Dictionary")
-    @dict_1k = set_dicts(@dict_1k, './data/top_1000.txt', "Pimsleur top 1k")
+    @full_dictionary = set_dicts(@full_dictionary, './data/xresultant.txt', "Fullsize Dictionary")
+    @popular_dictionary = set_dicts(@popular_dictionary, './data/top10k.txt', "Top 10,000 Words")
+    @proper_name_dictionary = set_dicts(@proper_name_dictionary, './data/SMITH.txt', "Proper Names Dictionary")
+    @top_1000_words = set_dicts(@top_1000_words, './data/top_1000.txt', "Pimsleur top 1k")
   end
 
   def get_puzzle_list
@@ -58,7 +58,6 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
   end
 
   def conform_puzzles(doc)
-    #Strips XML tags and creates a list of Puzzle objects
     puzzle_list = Array.new
     doc.each_element("//item") { |e|
           puzzle_list << Puzzle.new(e)
@@ -106,7 +105,7 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
 
   def solve_with_letters(puzz)
     mask = %w[ E T A O I N S H R D L C U M W F G Y P B V K J X Q Z ]
-    @let_list.each { |k, v|
+    @letter_list.each { |k, v|
       if v.possible.frozen? then next end
       if v.possible.empty? then next end
 
@@ -122,20 +121,25 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
   def setup_solve(puzz)
     c = puzz.crypto_broken
     a = puzz.author_broken
-    c.map! {|x| x = Word.new(x, @dicts)}
+    c.map! {|x| x = Word.new(x, @full_dictionary)}
 
     c.each {|x|
-      if x.possibles.length > 0 then next end
-      x = Word.new(x.name, @name_dict)
+      if x.has_possibilities? then next end
+      x = Word.new(x.name, @proper_name_dictionary)
     }
 
     a.map! {|x|
-      x = Word.new(x, @name_dict)
+      x = Word.new(x, @proper_name_dictionary)
     }
 
     a.each { |x|
       #Allows single letters in the author section to be any standard initial. "I M Pei" for ex.
       if x.length == 1 then x.possibles = *('A'..'Z') end
+    }
+
+    a.each {|x|
+      if x.has_possibilities? then next end
+      x = Word.new(x.name, @full_dictionary)
     }
 
     c += a
@@ -170,16 +174,16 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
         }
 
       if z == 4
-        run_smaller_dictionaries(c - puzz.author_broken, @pop_dict)
+        run_smaller_dictionaries(c - puzz.author_broken, @popular_dictionary)
       end
 
     #   if z == 5
-    #     run_smaller_dictionaries(c - puzz.author_broken, @dict_1k)
+    #     run_smaller_dictionaries(c - puzz.author_broken, @top_1000_words)
     #   end
 
     end
     puzz.full_broken = c
-    puzz.let_list = @let_list
+    puzz.letter_list = @letter_list
   end
 
 =begin
@@ -188,7 +192,7 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
       kill_singles
     end
 
-    known, unknown = split_letters_to_known_unknown(@let_list)
+    known, unknown = split_letters_to_known_unknown(@letter_list)
     if unknown.empty? then return end
 
     all_sets_of_letters = Array.new
@@ -290,13 +294,13 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
   end
 
   def kill_singles()
-    singulars = @let_list.dup
+    singulars = @letter_list.dup
 
     singulars.keep_if { |k, l|
       l.possible.length == 1
     }
 
-    @let_list.each_value { |l|
+    @letter_list.each_value { |l|
       next if l.possible.length == 1
       l.possible -= singulars.keys
     }
@@ -318,7 +322,7 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
   def char_matcher(w, p)
     counter = w.length-1                                #Compensates for the array starting at ZERO
     for x in 0..counter                               # Spies across the full length of each word trying to match key letter objects to possbiles
-      next if @let_list[w[x]].possible.include?(p[x]) # It IS possbile so continue
+      next if @letter_list[w[x]].possible.include?(p[x]) # It IS possbile so continue
       return false                                    #This key letter can't be found in the possible solutions
     end
     true   # After checking each character we have no failures of match, so it returns TRUE
@@ -331,7 +335,7 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
                                                   # so we just work with the unique letters
 
     for position in 0..key.length-1         # POSITION is the spot in both words
-      letter = @let_list[key[position]]     #retrieves the letter OBJ for that position
+      letter = @letter_list[key[position]]     #retrieves the letter OBJ for that position
       if letter.possible.frozen? then next end # ' AND - are ignored
 
       letter.possible.clear     # Resets the letter.possible list
@@ -353,9 +357,9 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
     # Creates a list of letter objects, and includes apostrophes and hypens.
     # SALT is derived from the unique characters of the puzzle, excluding SPACES
 
-    @let_list = Hash.new    #Sets the empty hash for letter objects
+    @letter_list = Hash.new    #Sets the empty hash for letter objects
     salt.chars { |l|
-        @let_list.merge!({l => Letter.new(l)})
+        @letter_list.merge!({l => Letter.new(l)})
         # Uses the key_letter (lowercase) for each character as the HASHkey.
         # The value is the letter object created in the Letter.rb file.
     }
