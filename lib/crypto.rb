@@ -73,10 +73,10 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
     puzz.solution = (' ' << puzz.crypto << ' - ' << puzz.author << ' ')
     # puzz.full_broken.reverse!
     puzz.full_broken.each {|word|
-      if word.possibles.length != 1 then next end
-      puzz.solution.gsub!('-'+word.name+' ', '-'+word.possibles.first.to_s+' ')
-      puzz.solution.gsub!(' '+word.name+'-', ' '+word.possibles.first.to_s+'-')
-      puzz.solution.gsub!(' '+word.name+' ', ' '+word.possibles.first.to_s+' ')
+      if !(word.has_possibilities?) then next end
+      puzz.solution.gsub!('-'+word.name+' ', '-'+word.possibles.first.to_s+'* ')
+      puzz.solution.gsub!(' '+word.name+'-', ' '+word.possibles.first.to_s+'*-')
+      puzz.solution.gsub!(' '+word.name+' ', ' '+word.possibles.first.to_s+'* ')
     }
     puzz.solution.strip!
   end
@@ -84,10 +84,10 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
   def solve_with_letters(puzz)
     mask = %w[ E T A O I N S H R D L C U M W F G Y P B V K J X Q Z ]
     @letter_list.each { |k, v|
-      if v.possible.frozen? then next end
-      if v.possible.empty? then next end
+      if v.possibles.frozen? then next end
+      if v.possibles.empty? then next end
 
-      priority = v.possible.take_while{ |p|
+      priority = v.possibles.take_while{ |p|
         mask.include? p
       }
 
@@ -96,69 +96,65 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
     }
   end
 
-  def setup_solve(puzz)
-    c = puzz.crypto_broken
-    a = puzz.author_broken
+  def setup_solve(puzzle)
+    cryptogram = puzzle.crypto_broken
+    author_section = puzzle.author_broken
 
-    c.map! {|x| x = Word.new(x, @full_dictionary)}
+    cryptogram.map! {|x| x = Word.new(x, @full_dictionary)}
 
-    a.map! {|x| x = Word.new(x, @proper_name_dictionary)}
+    author_section.map! {|x| x = Word.new(x, @proper_name_dictionary)}
 
-    a.each { |x| x.possibles = *('A'..'Z') if x.length == 1 }
+    author_section.each { |x| x.possibles = *('A'..'Z') if x.length == 1 }
       #Allows single letters in the author section to be any standard initial. "I M Pei" for ex.
 
-    c.each {|x|
+    cryptogram.each {|x|
       next if x.has_possibilities?
       x.reload_possibles(@proper_name_dictionary)
     }
 
-    a.each {|x|
-      if x.has_possibilities? then next end
+    cryptogram.each {|x|
+      next if x.has_possibilities?
       x.reload_possibles(@full_dictionary)
     }
 
-    c += a
+    cryptogram += author_section
 
-    c.sort!{ |x, y|
+    cryptogram.sort!{ |x, y|
       x.length <=> y.length
     }
 
     # binding.pry
     # Now that the author section and crypto section have word objects with each's own dictionary
     # we can work on them in the same way.
-    set_letters(puzz.full_uniques)
-    return c
+    @letter_list = set_letters(puzzle.full_uniques)
+    return cryptogram
   end
 
-  def solve(puzz)
-    c = setup_solve(puzz)
+  def solve(puzzle)
+    cryptogram = setup_solve(puzzle)
     # binding.pry
 
     for z in 1..6
 
-      c.cycle(5) { |word|
+      cryptogram.cycle(2) { |word|
       work_the_word(word)
       }
 
       3.times do
-        kill_singles()
+        @letter_list = kill_singles(@letter_list)
       end
 
-      c.each { |word|
-        reverse_lookup(word) if word.has_possibilities?
-        }
+      cryptogram.cycle(2) { |word|
+      work_the_word(word)
+      }
 
       if z == 4
-        run_smaller_dictionaries(c - puzz.author_broken, @popular_dictionary)
+        run_smaller_dictionaries(cryptogram - puzzle.author_broken, @popular_dictionary)
       end
 
-    #   if z == 5
-    #     run_smaller_dictionaries(c - puzz.author_broken, @top_1000_words)
-    #   end
-
     end
-    puzz.full_broken = c
-    puzz.letter_list = @letter_list
+    puzzle.full_broken = cryptogram
+    puzzle.letter_list = @letter_list
   end
 
 
@@ -170,27 +166,28 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
     }
   end
 
-  def try_dictionary(w, dictionary)
-    p = w.possibles.dup
-    w.possibles = dictionary.find_possible_matches(w)
-    reverse_lookup(w)
-    return p if w.has_possibilities? == false
+  def try_dictionary(word, dictionary)
+    p = word.possibles.dup
+    word.possibles = dictionary.find_possible_matches(word)
+    reverse_lookup(word)
+    return p if word.has_possibilities? == false
 
-    condense_true(w.uniques, w.possibles)
-    return w.possibles
+    condense_true(word.uniques, word.possibles)
+    return word.possibles
   end
 
-  def kill_singles()
-    singulars = @letter_list.dup
+  def kill_singles(letter_hash)
+    singulars = letter_hash.dup
 
     singulars.keep_if { |k, l|
-      l.possible.length == 1
+      l.singular?
     }
 
-    @letter_list.each_value { |l|
-      next if l.possible.length == 1
-      l.possible -= singulars.keys
+    letter_hash.each_value { |l|
+      next if l.singular?
+      l.possibles -= singulars.keys
     }
+    return letter_hash
   end
 
   def work_the_word(word)
@@ -209,7 +206,7 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
   def char_matcher(w, p)
     counter = w.length-1                                #Compensates for the array starting at ZERO
     for x in 0..counter                               # Spies across the full length of each word trying to match key letter objects to possbiles
-      next if @letter_list[w[x]].possible.include?(p[x]) # It IS possbile so continue
+      next if @letter_list[w[x]].possibles.include?(p[x]) # It IS possbile so continue
       return false                                    #This key letter can't be found in the possible solutions
     end
     true   # After checking each character we have no failures of match, so it returns TRUE
@@ -223,13 +220,13 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
 
     for position in 0..key.length-1         # POSITION is the spot in both words
       letter = @letter_list[key[position]]     #retrieves the letter OBJ for that position
-      if letter.possible.frozen? then next end # ' AND - are ignored
+      if letter.possibles.frozen? then next end # ' AND - are ignored
 
-      letter.possible.clear     # Resets the letter.possible list
+      letter.possibles.clear     # Resets the letter.possibles list
 #      @calculations += 1       # Just an enumerator to gauge how many passes through this method on average
       words.each { |word|       # Chunks down on
-        if letter.possible.include?(word[position]) then next end
-        letter.possible << word[position]
+#        if letter.possibles.include?(word[position]) then next end
+        letter.possibles << word[position]
       }
     end
 
@@ -239,12 +236,13 @@ class Solver   #The problem solver class. Gets puzzles, parses em, Solves em. Sa
     # Creates a list of letter objects, and includes apostrophes and hypens.
     # SALT is derived from the unique characters of the puzzle, excluding SPACES
 
-    @letter_list = Hash.new    #Sets the empty hash for letter objects
+    letter_list = Hash.new    #Sets the empty hash for letter objects
     salt.chars { |l|
-        @letter_list.merge!({l => Letter.new(l)})
+        letter_list.store(l, Letter.new(l))
         # Uses the key_letter (lowercase) for each character as the HASHkey.
         # The value is the letter object created in the Letter.rb file.
     }
+    return letter_list
   end
 end
 
